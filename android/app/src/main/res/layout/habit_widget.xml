@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:padding="8dp">
+
+    <!-- Top Header Row -->
+    <LinearLayout
+        android:id="@+id/header_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp">
+
+        <!-- Icon Box - Small -->
+        <TextView
+            android:id="@+id/widget_icon_text"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:gravity="center"
+            android:text="🏋️"
+            android:textSize="12sp"
+            android:background="@drawable/widget_icon_bg" />
+
+        <!-- Title ONLY -->
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Habit"
+            android:textColor="#DDEAF6"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:letterSpacing="-0.03"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Tick button - Small -->
+        <FrameLayout
+            android:id="@+id/widget_tick_box"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:background="@drawable/widget_tick_bg_unchecked">
+
+            <ImageView
+                android:id="@+id/widget_tick_icon"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_check_white"
+                android:visibility="invisible" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- Heatmap fills all remaining space; bitmap is pre-sized to match widget -->
+    <ImageView
+        android:id="@+id/widget_heatmap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/header_row"
+        android:layout_marginTop="4dp"
+        android:adjustViewBounds="false"
+        android:scaleType="fitXY" />
+
+</RelativeLayout>

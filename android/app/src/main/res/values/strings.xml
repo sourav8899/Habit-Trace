@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HabitTrace</string>
+    <string name="widget_description">HabitTrace — habit heatmap and tick (2×4)</string>
+    <string name="widget_description_small">HabitTrace — compact daily tick (2×2)</string>
+</resources>
