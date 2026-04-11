@@ -1,3 +1,17 @@
+import 'dart:convert';
+
+const String defaultHabitEmoji = '\u{2B50}';
+
+String normalizeHabitEmoji(String value) {
+  if (value.isEmpty || value == '?') return defaultHabitEmoji;
+
+  try {
+    return utf8.decode(latin1.encode(value));
+  } catch (_) {
+    return value;
+  }
+}
+
 class HabitDayRecord {
   final bool isCompleted;
   final String remarks;
@@ -43,7 +57,7 @@ class Habit {
     required this.name,
     this.description = '',
     this.colorValue = 0xFF008542,
-    this.iconEmoji = '?',
+    this.iconEmoji = defaultHabitEmoji,
     required this.createdAt,
     this.reminderHour,
     this.reminderMinute,
@@ -85,7 +99,9 @@ class Habit {
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       colorValue: json['colorValue'] as int? ?? 0xFF008542,
-      iconEmoji: json['iconEmoji'] as String? ?? '?',
+      iconEmoji: normalizeHabitEmoji(
+        json['iconEmoji'] as String? ?? defaultHabitEmoji,
+      ),
       createdAt: DateTime.parse(json['createdAt'] as String),
       reminderHour: json['reminderHour'] as int?,
       reminderMinute: json['reminderMinute'] as int?,

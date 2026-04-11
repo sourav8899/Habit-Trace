@@ -51,6 +51,16 @@ class HabitWidgetConfigureActivity : Activity() {
             e.printStackTrace()
         }
 
+        if (habitsList.isEmpty()) {
+            startActivity(
+                Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+            )
+            finish()
+            return
+        }
+
         val listView = findViewById<ListView>(R.id.habits_list)
         
         val adapter = object : ArrayAdapter<JSONObject>(this, R.layout.item_habit_configure, habitsList) {

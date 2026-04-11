@@ -6,9 +6,15 @@ import '../logic/habit_provider.dart';
 
 class HabitItem extends ConsumerStatefulWidget {
   final Habit habit;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const HabitItem({super.key, required this.habit, required this.onDelete});
+  const HabitItem({
+    super.key,
+    required this.habit,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   ConsumerState<HabitItem> createState() => _HabitItemState();
@@ -36,6 +42,10 @@ class _HabitItemState extends ConsumerState<HabitItem> {
   }
 
   void _toggleDate(DateTime date) {
+    final today = DateTime.now();
+    final todayOnlyDate = DateTime(today.year, today.month, today.day);
+    if (date.isAfter(todayOnlyDate)) return;
+
     final currentHabit = _currentHabitRead;
     final dateString = _formatDate(date);
     final record = currentHabit.dailyRecords[dateString] ?? HabitDayRecord();
@@ -119,12 +129,40 @@ class _HabitItemState extends ConsumerState<HabitItem> {
   }
 
   void _clearReminder(Habit habit) {
-    ref.read(habitProvider.notifier).updateHabit(
-      habit.copyWith(clearReminder: true),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        title: const Text('Remove Reminder?'),
+        content: const Text('Are you sure you want to turn off daily notifications for this habit?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+            onPressed: () {
+              ref.read(habitProvider.notifier).updateHabit(
+                habit.copyWith(clearReminder: true),
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
     );
   }
 
   void _showDayDetails(DateTime date) {
+    final today = DateTime.now();
+    final todayOnlyDate = DateTime(today.year, today.month, today.day);
+    if (date.isAfter(todayOnlyDate)) return;
+
     final currentHabit = _currentHabitRead;
     final dateString = _formatDate(date);
     final record = currentHabit.dailyRecords[dateString] ?? HabitDayRecord();
@@ -270,14 +308,30 @@ class _HabitItemState extends ConsumerState<HabitItem> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.grey,
-                  size: 24,
-                ),
-                onPressed: widget.onDelete,
-                splashRadius: 24,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 22,
+                    ),
+                    onPressed: widget.onEdit,
+                    splashRadius: 24,
+                    tooltip: 'Edit habit',
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.grey,
+                      size: 24,
+                    ),
+                    onPressed: widget.onDelete,
+                    splashRadius: 24,
+                    tooltip: 'Delete habit',
+                  ),
+                ],
               ),
             ],
           ),
@@ -352,6 +406,8 @@ class _HabitItemState extends ConsumerState<HabitItem> {
 
   Widget _buildGitHubGraph(Habit currentHabit) {
     final today = DateTime.now();
+    final todayOnlyDate = DateTime(today.year, today.month, today.day);
+
     final todayUtc = DateTime.utc(today.year, today.month, today.day);
     final createdUtc = DateTime.utc(currentHabit.createdAt.year, currentHabit.createdAt.month, currentHabit.createdAt.day);
     
@@ -406,53 +462,61 @@ class _HabitItemState extends ConsumerState<HabitItem> {
       final isCompleted = record.isCompleted;
       final hasRemarks = record.remarks.isNotEmpty;
 
-      final baseColor = isCompleted ? habitColor : Theme.of(context).colorScheme.surfaceContainerHighest;
-      // final isFirstOfMonth = date.day == 1;
-
+      final isFuture = date.isAfter(todayOnlyDate);
+      final baseColor = isCompleted 
+          ? habitColor 
+          : isFuture 
+              ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+              : Theme.of(context).colorScheme.surfaceContainerHighest;
       currentColumnSquares.add(
         GestureDetector(
-          onTap: () => _toggleDate(date),
-          onLongPress: () => _showDayDetails(date),
-          child: Container(
-            width: squareSize,
-            height: squareSize,
-            margin: const EdgeInsets.only(bottom: marginSize),
-            decoration: BoxDecoration(
-              color: baseColor,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color:
-                    isCompleted
-                        ? Colors.transparent
-                        : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isCompleted ? Colors.white : Colors.black54,
-                  ),
+          onTap: isFuture ? null : () => _toggleDate(date),
+          onLongPress: isFuture ? null : () => _showDayDetails(date),
+          child: Opacity(
+            opacity: isFuture ? 0.35 : 1.0,
+            child: Container(
+              width: squareSize,
+              height: squareSize,
+              margin: const EdgeInsets.only(bottom: marginSize),
+              decoration: BoxDecoration(
+                color: baseColor,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color:
+                      isCompleted || isFuture
+                          ? Colors.transparent
+                          : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
                 ),
-                if (hasRemarks)
-                  Positioned(
-                    bottom: 2,
-                    right: 2,
-                    child: Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color:
-                            isCompleted ? Colors.white54 : Colors.grey.shade500,
-                        shape: BoxShape.circle,
-                      ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: isCompleted 
+                          ? Colors.white 
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
-              ],
+                  if (hasRemarks)
+                    Positioned(
+                      bottom: 2,
+                      right: 2,
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color:
+                              isCompleted ? Colors.white54 : Colors.grey.shade500,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -466,6 +530,7 @@ class _HabitItemState extends ConsumerState<HabitItem> {
         monthForColumn = null;
       }
     }
+
 
     if (currentColumnSquares.isNotEmpty) {
       while (currentColumnSquares.length < 7) {

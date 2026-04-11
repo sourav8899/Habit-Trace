@@ -28,6 +28,46 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  void _toggleToday(Habit habit) {
+    final dateString = _formatDate(DateTime.now());
+    final record = habit.dailyRecords[dateString] ?? HabitDayRecord();
+
+    final newRecords = Map<String, HabitDayRecord>.from(habit.dailyRecords);
+    newRecords[dateString] = record.copyWith(isCompleted: !record.isCompleted);
+
+    final updatedHabit = habit.copyWith(dailyRecords: newRecords);
+    ref.read(habitProvider.notifier).updateHabit(updatedHabit);
+  }
+
+  Future<void> _removeHabit(Habit habit) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Habit?'),
+            content: Text(
+              'Are you sure you want to delete "${habit.name}"? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      ref.read(habitProvider.notifier).removeHabit(habit.id);
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   int _calculateGlobalStreak(List<Habit> habits) {
     if (habits.isEmpty) return 0;
     int streak = 0;
@@ -149,6 +189,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     final allHabits = ref.watch(habitProvider);
+    final hasNoHabits = allHabits.isEmpty;
 
     if (_selectedViewMode != 'Overview' &&
         !allHabits.any((h) => h.id == _selectedViewMode)) {
@@ -170,13 +211,14 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             : allHabits.firstWhere((h) => h.id == _selectedViewMode);
 
     final title =
-        selectedHabit != null ? selectedHabit.name : 'Overall habit overview';
+        selectedHabit != null ? selectedHabit.name : 'Your Mastery Journey';
     final subtitle =
         selectedHabit != null && selectedHabit.description.isNotEmpty
             ? selectedHabit.description
-            : 'No discription is provided';
-    final tag =
-        selectedHabit != null ? 'HABIT DETAILS' : 'This is your habits preview';
+            : (selectedHabit != null
+                ? 'No description yet! Add one to stay inspired. ✨'
+                : 'Tracking your progress across all habits. You are doing amazing work! 🚀');
+    final tag = selectedHabit != null ? 'HABIT DETAILS' : 'GLOBAL OVERVIEW';
 
     return Scaffold(
       appBar: AppBar(
@@ -193,8 +235,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               },
               child: Container(
                 child: CircleAvatar(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.5),
                   radius: 16,
                   child: Icon(
                     Icons.person,
@@ -217,7 +260,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           ],
         ),
         actions: [
-          if (selectedHabit != null)
+          if (selectedHabit != null) ...[
             IconButton(
               icon: Icon(
                 Icons.edit_outlined,
@@ -225,219 +268,288 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               ),
               onPressed: () => _showEditHabitDialog(selectedHabit),
             ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.grey),
+              onPressed: () => _removeHabit(selectedHabit),
+            ),
+          ],
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.show_chart,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
+      body:
+          hasNoHabits
+              ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'VIEW MODE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
+                      Icon(
+                        Icons.bar_chart_rounded,
+                        size: 56,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedViewMode,
-                          isDense: true,
-                          isExpanded: true,
-                          dropdownColor:
-                              Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                          icon: Icon(
-                            Icons.keyboard_arrow_down,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                            size: 20,
-                          ),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedViewMode = val);
-                            }
-                          },
-                          items: [
-                            const DropdownMenuItem(
-                              value: 'Overview',
-                              child: Text('Overview (All Habits)'),
-                            ),
-                            ...allHabits.map(
-                              (h) => DropdownMenuItem(
-                                value: h.id,
-                                child: Text(
-                                  h.name,
-                                  overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 16),
+                      Text(
+                        'Please add a habit',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your stats will appear here once you create your first habit.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              : ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.show_chart,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'VIEW MODE',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
                                 ),
                               ),
-                            ),
-                          ],
+                              DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedViewMode,
+                                  isDense: true,
+                                  isExpanded: true,
+                                  dropdownColor:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
+                                  icon: Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                    size: 20,
+                                  ),
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                  ),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _selectedViewMode = val);
+                                    }
+                                  },
+                                  items: [
+                                    const DropdownMenuItem(
+                                      value: 'Overview',
+                                      child: Text('Overview (All Habits)'),
+                                    ),
+                                    ...allHabits.map(
+                                      (h) => DropdownMenuItem(
+                                        value: h.id,
+                                        child: Text(
+                                          h.name,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-          Text(
-            tag,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.onSurface,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // ── Habit Info Card (only when viewing a single habit) ──
-          if (selectedHabit != null) _buildHabitInfoCard(selectedHabit),
-          if (selectedHabit != null) const SizedBox(height: 24),
-
-          _buildHeatmapCard(habitsToAnalyze),
-          const SizedBox(height: 24),
-
-          _buildStreakCard(globalStreak),
-          const SizedBox(height: 24),
-
-          _buildCompletedCard(totalCompleted, lastMonthCompleted),
-          const SizedBox(height: 24),
-
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                  Text(
+                    tag,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Habit Info Card (only when viewing a single habit) ──
+                  if (selectedHabit != null) _buildHabitInfoCard(selectedHabit),
+                  if (selectedHabit != null) const SizedBox(height: 24),
+
+                  if (habitsToAnalyze.isNotEmpty)
+                    _buildHeatmapCard(habitsToAnalyze),
+                  if (habitsToAnalyze.isNotEmpty) const SizedBox(height: 24),
+
+                  _buildStreakCard(globalStreak),
+                  const SizedBox(height: 24),
+
+                  _buildCompletedCard(totalCompleted, lastMonthCompleted),
+                  const SizedBox(height: 24),
+
+                  Row(
                     children: [
-                      Text(
-                        'RANK',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RANK',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                totalCompleted > 50 ? 'Master' : 'Novice',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        totalCompleted > 50 ? 'Master' : 'Novice',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'LEVEL',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(totalCompleted / 10).floor() + 1}',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 24),
+
+                  // _buildBarChartCard(habitsToAnalyze),
+                  const SizedBox(height: 24),
+
+                  Text(
+                    'Achievements',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'LEVEL',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${(totalCompleted / 10).floor() + 1}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                  const SizedBox(height: 16),
+
+                  _buildAchievementsGrid(globalStreak, totalCompleted),
+                  const SizedBox(height: 32),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          _buildBarChartCard(habitsToAnalyze),
-          const SizedBox(height: 24),
-
-          Text(
-            'Achievements',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAchievementsGrid(globalStreak, totalCompleted),
-          const SizedBox(height: 32),
-        ],
-      ),
     );
   }
 
@@ -776,35 +888,65 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     'LESS',
                     style: TextStyle(
                       fontSize: 8,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF9BE9A8),
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(width: 4),
                   _buildLegendSquare(
                     Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
-                  _buildLegendSquare(
-                    Theme.of(context).colorScheme.primaryContainer,
+                  Builder(
+                    builder: (context) {
+                      Color baseColor = const Color(
+                        0xFF216E39,
+                      ); // GitHub Dark Green
+                      if (_selectedViewMode != 'Overview') {
+                        final h = habits.firstWhere(
+                          (h) => h.id == _selectedViewMode,
+                        );
+                        baseColor = Color(h.colorValue);
+                      }
+
+                      return Row(
+                        children: [
+                          if (_selectedViewMode == 'Overview') ...[
+                            _buildLegendSquare(
+                              const Color(0xFF9BE9A8),
+                            ), // Level 1
+                            _buildLegendSquare(
+                              const Color(0xFF40C463),
+                            ), // Level 2
+                            _buildLegendSquare(
+                              const Color(0xFF30A14E),
+                            ), // Level 3
+                            _buildLegendSquare(
+                              const Color(0xFF216E39),
+                            ), // Level 4
+                          ] else ...[
+                            _buildLegendSquare(
+                              baseColor.withValues(alpha: 0.2),
+                            ),
+                            _buildLegendSquare(
+                              baseColor.withValues(alpha: 0.5),
+                            ),
+                            _buildLegendSquare(
+                              baseColor.withValues(alpha: 0.8),
+                            ),
+                            _buildLegendSquare(baseColor),
+                          ],
+                        ],
+                      );
+                    },
                   ),
-                  _buildLegendSquare(
-                    Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.5),
-                  ),
-                  _buildLegendSquare(Theme.of(context).colorScheme.primary),
-                  _buildLegendSquare(
-                    Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.9),
-                  ),
+
                   const SizedBox(width: 4),
                   Text(
                     'MORE',
                     style: TextStyle(
                       fontSize: 8,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF216E39),
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -857,23 +999,35 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             count++;
                         }
 
+                        Color baseColor = const Color(
+                          0xFF216E39,
+                        ); // GitHub Green
+                        if (_selectedViewMode != 'Overview') {
+                          final h = habits.firstWhere(
+                            (h) => h.id == _selectedViewMode,
+                          );
+                          baseColor = Color(h.colorValue);
+                        }
+
                         Color color =
                             Theme.of(
                               context,
                             ).colorScheme.surfaceContainerHighest;
-                        if (count == 1)
-                          color =
-                              Theme.of(context).colorScheme.primaryContainer;
-                        else if (count == 2)
-                          color = Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.5);
-                        else if (count == 3)
-                          color = Theme.of(context).colorScheme.primary;
-                        else if (count >= 4)
-                          color = Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.9);
+
+                        if (count > 0) {
+                          if (_selectedViewMode == 'Overview') {
+                            if (count == 1)
+                              color = const Color(0xFF9BE9A8);
+                            else if (count == 2)
+                              color = const Color(0xFF40C463);
+                            else if (count == 3)
+                              color = const Color(0xFF30A14E);
+                            else if (count >= 4)
+                              color = const Color(0xFF216E39);
+                          } else {
+                            color = baseColor;
+                          }
+                        }
 
                         return Container(
                           width: 10,
@@ -1136,12 +1290,39 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   ],
                 ),
               ),
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: habitColor,
-                  shape: BoxShape.circle,
+              GestureDetector(
+                onTap: () => _toggleToday(habit),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          habit
+                                      .dailyRecords[_formatDate(DateTime.now())]
+                                      ?.isCompleted ==
+                                  true
+                              ? habitColor
+                              : habitColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: habitColor.withOpacity(0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 28,
+                      color:
+                          habit
+                                      .dailyRecords[_formatDate(DateTime.now())]
+                                      ?.isCompleted ==
+                                  true
+                              ? Colors.white
+                              : habitColor,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1268,29 +1449,88 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     '👩‍💻',
   ];
 
+  static const List<String> _safeHabitIcons = [
+    '\u{1F3CB}\u{FE0F}',
+    '\u{1F3C3}',
+    '\u{1F6B4}',
+    '\u{1F93A}',
+    '\u{1F9D8}',
+    '\u{1F6BC}',
+    '\u{1F4A7}',
+    '\u{1F971}',
+    '\u{1F4A4}',
+    '\u{1F9EC}',
+    '\u{1F4DA}',
+    '\u{1F4DD}',
+    '\u{1F4BB}',
+    '\u{1F393}',
+    '\u{1F52C}',
+    '\u{1F4C8}',
+    '\u{1F4BC}',
+    '\u{2705}',
+    '\u{1F3C6}',
+    '\u{1F4AC}',
+    '\u{1F957}',
+    '\u{2615}',
+    '\u{1F34E}',
+    '\u{1F37F}',
+    '\u{1F37A}',
+    '\u{1F6AB}',
+    '\u{1F4B0}',
+    '\u{1F3A8}',
+    '\u{1F3B5}',
+    '\u{1F3A7}',
+    '\u{1F331}',
+    '\u{1F33B}',
+    '\u{1F98B}',
+    '\u{1F30D}',
+    '\u{2728}',
+    '\u{1F525}',
+    '\u{1F319}',
+    '\u{2600}\u{FE0F}',
+    '\u{1F9D0}',
+    '\u{1F4AB}',
+    '\u{1F44A}',
+    '\u{1F91D}',
+    '\u{1F496}',
+    '\u{1F64F}',
+    '\u{1F389}',
+    '\u{1F680}',
+    '\u{1F3AF}',
+    '\u{1F511}',
+    '\u{1F43E}',
+    '\u{1F469}\u{200D}\u{1F4BB}',
+  ];
+
   void _showEditHabitDialog(Habit habit) {
     final nameController = TextEditingController(text: habit.name);
     final descController = TextEditingController(text: habit.description);
     int selectedColor = habit.colorValue;
-    String selectedIcon = habit.iconEmoji;
+    String selectedIcon = normalizeHabitEmoji(habit.iconEmoji);
     bool reminderEnabled =
         habit.reminderHour != null && habit.reminderMinute != null;
     TimeOfDay reminderTime = TimeOfDay(
       hour: habit.reminderHour ?? 20,
       minute: habit.reminderMinute ?? 0,
     );
+    bool showValidation = false;
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final nameMissing =
+                showValidation && nameController.text.trim().isEmpty;
+            final descriptionMissing =
+                showValidation && descController.text.trim().isEmpty;
+
             return AlertDialog(
               backgroundColor:
                   Theme.of(context).colorScheme.surfaceContainerHighest,
               surfaceTintColor: Colors.transparent,
               title: Text(
-                'Edit Habit',
+                'Refine your Habit',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
@@ -1303,138 +1543,87 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   children: [
                     TextField(
                       controller: nameController,
+                      onChanged: (_) => setState(() {}),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       cursorColor: Color(selectedColor),
                       decoration: InputDecoration(
-                        labelText: 'Habit Name',
+                        labelText: 'Goal Name ✍️',
                         labelStyle: TextStyle(color: Colors.grey.shade500),
-                        enabledBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: nameMissing ? Colors.red : Colors.grey,
+                          ),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(selectedColor)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                nameMissing ? Colors.red : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: descController,
+                      onChanged: (_) => setState(() {}),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       cursorColor: Color(selectedColor),
                       decoration: InputDecoration(
-                        labelText: 'Description',
+                        labelText: 'Motivation / Notes ✨',
                         labelStyle: TextStyle(color: Colors.grey.shade500),
-                        enabledBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing ? Colors.red : Colors.grey,
+                          ),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(selectedColor)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing
+                                    ? Colors.red
+                                    : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 28),
-                    const Text(
-                      'Theme Color',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children:
-                          _habitColors.map((c) {
-                            return GestureDetector(
-                              onTap: () => setState(() => selectedColor = c),
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Color(c),
-                                  shape: BoxShape.circle,
-                                  border:
-                                      selectedColor == c
-                                          ? Border.all(
-                                            color: Colors.white,
-                                            width: 3,
-                                          )
-                                          : null,
-                                  boxShadow:
-                                      selectedColor == c
-                                          ? [
-                                            BoxShadow(
-                                              color: Color(c).withOpacity(0.5),
-                                              blurRadius: 8,
-                                            ),
-                                          ]
-                                          : null,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                    ),
-                    const SizedBox(height: 28),
-                    const Text(
-                      'Icon',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children:
-                          _habitIcons.map((emoji) {
-                            final isSelected = selectedIcon == emoji;
-                            return GestureDetector(
-                              onTap: () => setState(() => selectedIcon = emoji),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? Color(
-                                            selectedColor,
-                                          ).withOpacity(0.15)
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color:
-                                        isSelected
-                                            ? Color(selectedColor)
-                                            : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    emoji,
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
                     ),
                     const SizedBox(height: 28),
                     Row(
                       children: [
                         const Text(
-                          'Reminder',
+                          'Daily Reminder',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1496,6 +1685,100 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Change the Vibe',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children:
+                          _habitColors.map((c) {
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedColor = c),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Color(c),
+                                  shape: BoxShape.circle,
+                                  border:
+                                      selectedColor == c
+                                          ? Border.all(
+                                            color: Colors.white,
+                                            width: 3,
+                                          )
+                                          : null,
+                                  boxShadow:
+                                      selectedColor == c
+                                          ? [
+                                            BoxShadow(
+                                              color: Color(c).withOpacity(0.5),
+                                              blurRadius: 8,
+                                            ),
+                                          ]
+                                          : null,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Switch Icon',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          _safeHabitIcons.map((emoji) {
+                            final isSelected = selectedIcon == emoji;
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedIcon = emoji),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color:
+                                      isSelected
+                                          ? Color(
+                                            selectedColor,
+                                          ).withOpacity(0.15)
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color:
+                                        isSelected
+                                            ? Color(selectedColor)
+                                            : Colors.grey.shade300,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    emoji,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
                   ],
                 ),
               ),
@@ -1513,7 +1796,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    if (nameController.text.trim().isEmpty) return;
+                    if (nameController.text.trim().isEmpty ||
+                        descController.text.trim().isEmpty) {
+                      setState(() => showValidation = true);
+                      return;
+                    }
                     if (reminderEnabled) {
                       final ok =
                           await NotificationService.requestReminderPermissions();

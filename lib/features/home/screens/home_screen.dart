@@ -10,7 +10,8 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/theme/theme_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final bool openAddHabit;
+  const HomeScreen({super.key, this.openAddHabit = false});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -18,6 +19,16 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.openAddHabit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showAddHabitDialog();
+      });
+    }
+  }
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -85,7 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int? reminderHour,
     int? reminderMinute,
   }) {
-    if (name.trim().isEmpty) return;
+    if (name.trim().isEmpty || description.trim().isEmpty) return;
     ref
         .read(habitProvider.notifier)
         .addHabit(
@@ -98,8 +109,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
   }
 
-  void _removeHabit(String id) {
-    ref.read(habitProvider.notifier).removeHabit(id);
+  Future<void> _removeHabit(Habit habit) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Habit?'),
+            content: Text(
+              'Are you sure you want to delete "${habit.name}"? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      ref.read(habitProvider.notifier).removeHabit(habit.id);
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   void _toggleToday(Habit habit) {
@@ -131,10 +167,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.only(top: 80.0),
             child: HabitItem(
               habit: habit,
-              onDelete: () {
-                _removeHabit(habit.id);
+              onEdit: () {
                 Navigator.pop(context);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _showEditHabitDialog(habit);
+                  }
+                });
               },
+              onDelete: () => _removeHabit(habit),
             ),
           ),
     );
@@ -156,6 +197,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     String selectedIcon = '⭐';
     bool reminderEnabled = false;
     TimeOfDay reminderTime = const TimeOfDay(hour: 20, minute: 0);
+    bool showValidation = false;
+    selectedIcon = defaultHabitEmoji;
 
     final List<int> colors = [
       0xFF008542, // Green
@@ -189,12 +232,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final nameMissing =
+                showValidation && nameController.text.trim().isEmpty;
+            final descriptionMissing =
+                showValidation && descController.text.trim().isEmpty;
+
             return AlertDialog(
               backgroundColor:
                   Theme.of(context).colorScheme.surfaceContainerHighest,
               surfaceTintColor: Colors.transparent,
               title: Text(
-                'New Habit',
+                'Start a New Journey',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
@@ -208,135 +256,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     TextField(
                       controller: nameController,
                       autofocus: true,
+                      onChanged: (_) => setState(() {}),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       cursorColor: Color(selectedColor),
                       decoration: InputDecoration(
-                        hintText: 'Habit Name (e.g., Read for 30 mins)',
+                        hintText: "What's your new goal? ✍️",
                         hintStyle: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 14,
                         ),
-                        enabledBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: nameMissing ? Colors.red : Colors.grey,
+                          ),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(selectedColor)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                nameMissing ? Colors.red : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: descController,
+                      onChanged: (_) => setState(() {}),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       cursorColor: Color(selectedColor),
                       decoration: InputDecoration(
-                        hintText: 'Description (e.g., Non-fiction books)',
+                        hintText: 'Why does this matter to you? ✨',
                         hintStyle: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 13,
                         ),
-                        enabledBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing ? Colors.red : Colors.grey,
+                          ),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(selectedColor)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing
+                                    ? Colors.red
+                                    : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Theme Color',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children:
-                          colors.map((c) {
-                            return GestureDetector(
-                              onTap: () => setState(() => selectedColor = c),
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Color(c),
-                                  shape: BoxShape.circle,
-                                  border:
-                                      selectedColor == c
-                                          ? Border.all(
-                                            color: Colors.black87,
-                                            width: 3,
-                                          )
-                                          : null,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                    ),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Icon',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children:
-                          icons.map((emoji) {
-                            final isSelected = selectedIcon == emoji;
-                            return GestureDetector(
-                              onTap: () => setState(() => selectedIcon = emoji),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? Color(
-                                            selectedColor,
-                                          ).withOpacity(0.15)
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color:
-                                        isSelected
-                                            ? Color(selectedColor)
-                                            : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    emoji,
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
                     ),
                     const SizedBox(height: 28),
                     Row(
                       children: [
                         const Text(
-                          'Reminder',
+                          'Want a daily Reminder?',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -399,6 +405,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Pick your Vibe',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children:
+                          colors.map((c) {
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedColor = c),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Color(c),
+                                  shape: BoxShape.circle,
+                                  border:
+                                      selectedColor == c
+                                          ? Border.all(
+                                            color: Colors.black87,
+                                            width: 3,
+                                          )
+                                          : null,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Icon',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          _safeHabitIcons.map((emoji) {
+                            final isSelected = selectedIcon == emoji;
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedIcon = emoji),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color:
+                                      isSelected
+                                          ? Color(
+                                            selectedColor,
+                                          ).withOpacity(0.15)
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color:
+                                        isSelected
+                                            ? Color(selectedColor)
+                                            : Colors.grey.shade300,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    emoji,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
                   ],
                 ),
               ),
@@ -416,6 +507,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
+                    if (nameController.text.trim().isEmpty ||
+                        descController.text.trim().isEmpty) {
+                      setState(() => showValidation = true);
+                      return;
+                    }
+
                     if (reminderEnabled) {
                       final permissionGranted =
                           await NotificationService.requestReminderPermissions();
@@ -443,7 +540,458 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                     Navigator.pop(context);
                   },
-                  child: const Text('Add'),
+                  child: const Text("Let's Go!"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  static const List<int> _habitColors = [
+    0xFF008542,
+    0xFFEF4444,
+    0xFF3B82F6,
+    0xFFF59E0B,
+    0xFF8B5CF6,
+    0xFFEC4899,
+    0xFF06B6D4,
+    0xFFFF7849,
+    0xFF10B981,
+    0xFF6366F1,
+  ];
+
+  static const List<String> _habitIcons = [
+    'ðŸ‹ï¸',
+    'ðŸƒ',
+    'ðŸš´',
+    'ðŸ¤º',
+    'ðŸ§˜',
+    'ðŸš¼',
+    'ðŸ’§',
+    'ðŸ¥±',
+    'ðŸ’¤',
+    'ðŸ§¬',
+    'ðŸ“š',
+    'ðŸ“',
+    'ðŸ’»',
+    'ðŸŽ“',
+    'ðŸ”¬',
+    'ðŸ“ˆ',
+    'ðŸ’¼',
+    'âœ…',
+    'ðŸ†',
+    'ðŸ’¬',
+    'ðŸ¥—',
+    'â˜•',
+    'ðŸŽ',
+    'ðŸ¿',
+    'ðŸº',
+    'ðŸš«',
+    'ðŸ’°',
+    'ðŸŽ¨',
+    'ðŸŽµ',
+    'ðŸŽ§',
+    'ðŸŒ±',
+    'ðŸŒ»',
+    'ðŸ¦‹',
+    'ðŸŒ',
+    'âœ¨',
+    'ðŸ”¥',
+    'ðŸŒ™',
+    'â˜€ï¸',
+    'ðŸ§',
+    'ðŸ’«',
+    'ðŸ‘Š',
+    'ðŸ¤',
+    'ðŸ’–',
+    'ðŸ™',
+    'ðŸŽ‰',
+    'ðŸš€',
+    'ðŸŽ¯',
+    'ðŸ”‘',
+    'ðŸ¾',
+    'ðŸ‘©â€ðŸ’»',
+  ];
+
+  static const List<String> _safeHabitIcons = [
+    '\u{1F3CB}\u{FE0F}',
+    '\u{1F3C3}',
+    '\u{1F6B4}',
+    '\u{1F93A}',
+    '\u{1F9D8}',
+    '\u{1F6BC}',
+    '\u{1F4A7}',
+    '\u{1F971}',
+    '\u{1F4A4}',
+    '\u{1F9EC}',
+    '\u{1F4DA}',
+    '\u{1F4DD}',
+    '\u{1F4BB}',
+    '\u{1F393}',
+    '\u{1F52C}',
+    '\u{1F4C8}',
+    '\u{1F4BC}',
+    '\u{2705}',
+    '\u{1F3C6}',
+    '\u{1F4AC}',
+    '\u{1F957}',
+    '\u{2615}',
+    '\u{1F34E}',
+    '\u{1F37F}',
+    '\u{1F37A}',
+    '\u{1F6AB}',
+    '\u{1F4B0}',
+    '\u{1F3A8}',
+    '\u{1F3B5}',
+    '\u{1F3A7}',
+    '\u{1F331}',
+    '\u{1F33B}',
+    '\u{1F98B}',
+    '\u{1F30D}',
+    '\u{2728}',
+    '\u{1F525}',
+    '\u{1F319}',
+    '\u{2600}\u{FE0F}',
+    '\u{1F9D0}',
+    '\u{1F4AB}',
+    '\u{1F44A}',
+    '\u{1F91D}',
+    '\u{1F496}',
+    '\u{1F64F}',
+    '\u{1F389}',
+    '\u{1F680}',
+    '\u{1F3AF}',
+    '\u{1F511}',
+    '\u{1F43E}',
+    '\u{1F469}\u{200D}\u{1F4BB}',
+  ];
+
+  void _showEditHabitDialog(Habit habit) {
+    final nameController = TextEditingController(text: habit.name);
+    final descController = TextEditingController(text: habit.description);
+    int selectedColor = habit.colorValue;
+    String selectedIcon = normalizeHabitEmoji(habit.iconEmoji);
+    bool reminderEnabled =
+        habit.reminderHour != null && habit.reminderMinute != null;
+    TimeOfDay reminderTime = TimeOfDay(
+      hour: habit.reminderHour ?? 20,
+      minute: habit.reminderMinute ?? 0,
+    );
+    bool showValidation = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final nameMissing =
+                showValidation && nameController.text.trim().isEmpty;
+            final descriptionMissing =
+                showValidation && descController.text.trim().isEmpty;
+
+            return AlertDialog(
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              surfaceTintColor: Colors.transparent,
+              title: Text(
+                'Refine your Habit',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      cursorColor: Color(selectedColor),
+                      decoration: InputDecoration(
+                        labelText: 'Goal Name ✍️',
+                        labelStyle: TextStyle(color: Colors.grey.shade500),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: nameMissing ? Colors.red : Colors.grey,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                nameMissing ? Colors.red : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descController,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      cursorColor: Color(selectedColor),
+                      decoration: InputDecoration(
+                        labelText: 'Motivation / Notes ✨',
+                        labelStyle: TextStyle(color: Colors.grey.shade500),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing ? Colors.red : Colors.grey,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                descriptionMissing
+                                    ? Colors.red
+                                    : Color(selectedColor),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        const Text(
+                          'Daily Reminder',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const Spacer(),
+                        Switch(
+                          value: reminderEnabled,
+                          onChanged: (v) => setState(() => reminderEnabled = v),
+                        ),
+                      ],
+                    ),
+                    if (reminderEnabled) ...[
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: reminderTime,
+                          );
+                          if (picked != null) {
+                            setState(() => reminderTime = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.notifications_active_outlined,
+                                color: Color(selectedColor),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _formatReminderTime(reminderTime),
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.schedule, color: Colors.grey),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Change the Vibe',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children:
+                          _habitColors.map((c) {
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedColor = c),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Color(c),
+                                  shape: BoxShape.circle,
+                                  border:
+                                      selectedColor == c
+                                          ? Border.all(
+                                            color: Colors.black87,
+                                            width: 3,
+                                          )
+                                          : null,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Switch Icon',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          _safeHabitIcons.map((emoji) {
+                            final isSelected = selectedIcon == emoji;
+                            return GestureDetector(
+                              onTap: () => setState(() => selectedIcon = emoji),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color:
+                                      isSelected
+                                          ? Color(
+                                            selectedColor,
+                                          ).withOpacity(0.15)
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color:
+                                        isSelected
+                                            ? Color(selectedColor)
+                                            : Colors.grey.shade300,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    emoji,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Color(selectedColor),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty ||
+                        descController.text.trim().isEmpty) {
+                      setState(() => showValidation = true);
+                      return;
+                    }
+                    if (reminderEnabled) {
+                      final permissionGranted =
+                          await NotificationService.requestReminderPermissions();
+                      if (!context.mounted) return;
+                      if (!permissionGranted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Allow notifications and Alarms & reminders to enable exact habit reminders.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                    }
+
+                    ref
+                        .read(habitProvider.notifier)
+                        .updateHabit(
+                          habit.copyWith(
+                            name: nameController.text.trim(),
+                            description: descController.text.trim(),
+                            colorValue: selectedColor,
+                            iconEmoji: selectedIcon,
+                            reminderHour:
+                                reminderEnabled ? reminderTime.hour : null,
+                            reminderMinute:
+                                reminderEnabled ? reminderTime.minute : null,
+                            clearReminder: !reminderEnabled,
+                          ),
+                        );
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
                 ),
               ],
             );
@@ -486,67 +1034,83 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final Color habitColor = Color(habit.colorValue);
     final String iconEmoji = habit.iconEmoji;
 
-    return GestureDetector(
-      onTap: () => _showHabitDetails(habit),
-      onLongPress: () => _openHabitStats(habit),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.06),
-              blurRadius: 40,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () => _toggleToday(habit),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.06),
+            blurRadius: 40,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Toggle Button Section
+          GestureDetector(
+            onTap: () => _toggleToday(habit),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
               child: Container(
-                width: 24,
-                height: 24,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: isCompletedToday ? habitColor : Colors.transparent,
                   border: Border.all(
                     color: isCompletedToday ? habitColor : Colors.grey.shade300,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child:
                     isCompletedToday
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
+                        ? const Icon(Icons.check, size: 22, color: Colors.white)
                         : null,
               ),
             ),
-            const SizedBox(width: 16),
-            Text(iconEmoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                habit.name,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color:
-                      isCompletedToday
-                          ? Colors.grey.shade400
-                          : Theme.of(context).colorScheme.onSurface,
-                  decoration:
-                      isCompletedToday ? TextDecoration.lineThrough : null,
+          ),
+          // Habit Info Section (Clickable for Details)
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showHabitDetails(habit),
+              onLongPress: () => _openHabitStats(habit),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 18, 18, 18),
+                child: Row(
+                  children: [
+                    Text(iconEmoji, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        habit.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              isCompletedToday
+                                  ? Colors.grey.shade400
+                                  : Theme.of(context).colorScheme.onSurface,
+                          decoration:
+                              isCompletedToday
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                        ),
+                      ),
+                    ),
+                    _buildMiniStreak(habit),
+                  ],
                 ),
               ),
             ),
-            _buildMiniStreak(habit),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -698,8 +1262,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               },
               child: Container(
                 child: CircleAvatar(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.5),
                   radius: 16,
                   child: Icon(
                     Icons.person,
@@ -811,7 +1376,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.add, size: 16, color: Theme.of(context).colorScheme.primary),
+                            Icon(
+                              Icons.add,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'New Habit',

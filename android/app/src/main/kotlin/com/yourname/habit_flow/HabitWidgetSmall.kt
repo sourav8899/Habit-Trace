@@ -36,46 +36,70 @@ class HabitWidgetSmall : AppWidgetProvider() {
             val habitId = widgetPrefs.getString("widget_$appWidgetId", null)
             val views = RemoteViews(context.packageName, R.layout.habit_widget_small)
 
+            val prefs = HomeWidgetPlugin.getData(context)
+            val habitsJson = prefs.getString("habits_list", "[]") ?: "[]"
+            val hasHabits = try { JSONArray(habitsJson).length() > 0 } catch (e: Exception) { false }
+
             if (habitId == null) {
-                views.setTextViewText(R.id.widget_title, "Tap to re-configure")
                 views.setViewVisibility(R.id.widget_tick_icon, android.view.View.INVISIBLE)
                 views.setInt(R.id.widget_tick_box, "setBackgroundColor", Color.TRANSPARENT)
-                
-                val intent = Intent(context, HabitWidgetConfigureActivity::class.java).apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                views.setViewVisibility(R.id.widget_heatmap, android.view.View.GONE)
+                views.setViewVisibility(R.id.widget_add_button, android.view.View.VISIBLE)
+
+                if (hasHabits) {
+                    views.setTextViewText(R.id.widget_title, "Select a habit")
+                    val intent = Intent(context, HabitWidgetConfigureActivity::class.java).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                    val configPi = PendingIntent.getActivity(
+                        context, appWidgetId, intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_add_button, configPi)
+                    views.setOnClickPendingIntent(R.id.widget_root, configPi)
+                } else {
+                    views.setTextViewText(R.id.widget_title, "No habits yet")
+                    val addUri = android.net.Uri.parse("habitflow://add_habit")
+                    val addPi = HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, addUri)
+                    views.setOnClickPendingIntent(R.id.widget_add_button, addPi)
+                    views.setOnClickPendingIntent(R.id.widget_root, addPi)
                 }
-                val pendingIntent = PendingIntent.getActivity(
-                    context, appWidgetId, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
                 return
             }
 
-            val prefs = HomeWidgetPlugin.getData(context)
-            val habitsJson = prefs.getString("habits_list", "[]") ?: "[]"
             val habit = try {
                 val arr = JSONArray(habitsJson)
                 (0 until arr.length()).map { arr.getJSONObject(it) }.firstOrNull { it.optString("id") == habitId }
             } catch (e: Exception) { null }
 
             if (habit == null) {
-                views.setTextViewText(R.id.widget_title, "Tap to Select Habit")
                 views.setViewVisibility(R.id.widget_tick_icon, android.view.View.INVISIBLE)
                 views.setInt(R.id.widget_tick_box, "setBackgroundColor", Color.TRANSPARENT)
-                
-                val intent = Intent(context, HabitWidgetConfigureActivity::class.java).apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                views.setViewVisibility(R.id.widget_heatmap, android.view.View.GONE)
+                views.setViewVisibility(R.id.widget_add_button, android.view.View.VISIBLE)
+
+                if (hasHabits) {
+                    views.setTextViewText(R.id.widget_title, "Select a habit")
+                    val intent = Intent(context, HabitWidgetConfigureActivity::class.java).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                    val configPi = PendingIntent.getActivity(
+                        context, appWidgetId, intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_add_button, configPi)
+                    views.setOnClickPendingIntent(R.id.widget_root, configPi)
+                } else {
+                    views.setTextViewText(R.id.widget_title, "No habits yet")
+                    val addUri = android.net.Uri.parse("habitflow://add_habit")
+                    val addPi = HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, addUri)
+                    views.setOnClickPendingIntent(R.id.widget_add_button, addPi)
+                    views.setOnClickPendingIntent(R.id.widget_root, addPi)
                 }
-                val pendingIntent = PendingIntent.getActivity(
-                    context, appWidgetId, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
                 return
@@ -114,6 +138,9 @@ class HabitWidgetSmall : AppWidgetProvider() {
             val bitmapW = cols * (cellSize + gapPx) - gapPx
             val bitmapH = rows * (cellSize + gapPx) - gapPx
 
+            // Hide '+' button, show heatmap for valid habit
+            views.setViewVisibility(R.id.widget_add_button, android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_heatmap, android.view.View.VISIBLE)
             views.setImageViewBitmap(
                 R.id.widget_heatmap,
                 HabitWidget.buildHeatmap(completions, colorValue, createdAt, cols, rows, cellSize, gapPx, bitmapW, bitmapH)

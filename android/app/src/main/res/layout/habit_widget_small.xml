@@ -75,6 +75,21 @@
         android:layout_below="@id/header_row"
         android:layout_marginTop="4dp"
         android:adjustViewBounds="false"
-        android:scaleType="fitXY" />
+        android:scaleType="fitXY"
+        android:visibility="visible" />
+
+    <!-- '+' action button shown when no habit is selected/all habits deleted -->
+    <TextView
+        android:id="@+id/widget_add_button"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:text="+"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:background="@drawable/widget_tick_bg_unchecked"
+        android:visibility="gone" />
 
 </RelativeLayout>

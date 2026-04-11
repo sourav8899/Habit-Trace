@@ -87,6 +87,16 @@ class _HabitFlowAppState extends ConsumerState<HabitFlowApp> {
           );
         });
       }
+    } else if (uri.scheme == 'habitflow' && uri.host == 'add_habit') {
+      // Widget tapped the '+' button with no habits — open dashboard & trigger add
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const HomeScreen(openAddHabit: true),
+          ),
+          (route) => false,
+        );
+      });
     }
   }
 
