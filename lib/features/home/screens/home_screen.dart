@@ -109,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
   }
 
-  Future<void> _removeHabit(Habit habit) async {
+  Future<bool> _removeHabit(Habit habit) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
@@ -134,8 +134,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (confirmed == true) {
       ref.read(habitProvider.notifier).removeHabit(habit.id);
-      if (mounted) Navigator.pop(context);
+      return true;
     }
+    return false;
   }
 
   void _toggleToday(Habit habit) {
@@ -175,7 +176,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }
                 });
               },
-              onDelete: () => _removeHabit(habit),
+              onDelete: () async {
+                final deleted = await _removeHabit(habit);
+                if (deleted && mounted) {
+                  Navigator.pop(context);
+                }
+              },
             ),
           ),
     );

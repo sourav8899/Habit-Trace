@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../habits/logic/habit_provider.dart';
+import '../../onboarding/screens/onboarding_screen.dart';
 import 'dart:math';
 
 class ProfileScreen extends ConsumerWidget {
@@ -125,8 +126,12 @@ class ProfileScreen extends ConsumerWidget {
                       await ref.read(userProvider.notifier).reset();
                       
                       if (context.mounted) {
-                        Navigator.of(context).pop(); // Close dialog
-                        Navigator.of(context).pop(); // Go back from profile to reload App view
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) => const OnboardingScreen(),
+                          ),
+                          (route) => false, // Destroy the entire backstack
+                        );
                       }
                     } else {
                       setState(() => codeError = true);

@@ -52,11 +52,16 @@ class HabitWidgetConfigureActivity : Activity() {
         }
 
         if (habitsList.isEmpty()) {
-            startActivity(
-                Intent(this, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
-            )
+            val appWidgetManager = AppWidgetManager.getInstance(this)
+            val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+            if (info?.provider?.className == HabitWidgetSmall::class.java.name) {
+                HabitWidgetSmall.updateWidget(this, appWidgetManager, appWidgetId)
+            } else {
+                HabitWidget.updateWidget(this, appWidgetManager, appWidgetId)
+            }
+            val resultValue = Intent()
+            resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            setResult(RESULT_OK, resultValue)
             finish()
             return
         }
@@ -94,7 +99,12 @@ class HabitWidgetConfigureActivity : Activity() {
             
             // Update widget now
             val appWidgetManager = AppWidgetManager.getInstance(this)
-            HabitWidget.updateWidget(this, appWidgetManager, appWidgetId)
+            val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+            if (info?.provider?.className == HabitWidgetSmall::class.java.name) {
+                HabitWidgetSmall.updateWidget(this, appWidgetManager, appWidgetId)
+            } else {
+                HabitWidget.updateWidget(this, appWidgetManager, appWidgetId)
+            }
             
             val resultValue = Intent()
             resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)

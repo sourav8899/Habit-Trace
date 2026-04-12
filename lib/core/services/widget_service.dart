@@ -10,6 +10,9 @@ class WidgetService {
   static const _qualifiedWidgetName =
       'com.yourname.habit_flow.HabitWidget'; // Android
 
+  static const _qualifiedWidgetNameSmall =
+      'com.yourname.habit_flow.HabitWidgetSmall'; // Android 2x2 widget
+
   /// Call once at app startup
   static Future<void> init() async {
     try {
@@ -45,6 +48,9 @@ class WidgetService {
 
       await HomeWidget.updateWidget(
         qualifiedAndroidName: _qualifiedWidgetName,
+      );
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName: _qualifiedWidgetNameSmall,
       );
     } catch (e) {
       debugPrint('[WidgetService] update error: $e');

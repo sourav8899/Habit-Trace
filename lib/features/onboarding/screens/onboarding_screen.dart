@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../home/screens/home_screen.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -24,6 +25,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await ref.read(userProvider.notifier).setName(name);
     }
     await ref.read(userProvider.notifier).completeOnboarding();
+    
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    }
   }
 
   @override

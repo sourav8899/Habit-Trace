@@ -17,11 +17,22 @@ class StatsScreen extends ConsumerStatefulWidget {
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   int _selectedYear = DateTime.now().year;
   late String _selectedViewMode;
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _selectedViewMode = widget.initialHabitId ?? 'Overview';
+    
+    int w = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays ~/ 7;
+    double initialOffset = math.max(0.0, w * 16.0 - 200.0);
+    _scrollController = ScrollController(initialScrollOffset: initialOffset);
+  }
+  
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   String _formatDate(DateTime date) {
@@ -64,7 +75,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
     if (confirmed == true) {
       ref.read(habitProvider.notifier).removeHabit(habit.id);
-      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -183,6 +193,25 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       'DEC',
     ];
     return months[date.month - 1];
+  }
+
+  List<int> _getAvailableYears(List<Habit> habits) {
+    if (habits.isEmpty) return [DateTime.now().year];
+    
+    DateTime globalOldest = habits.first.createdAt;
+    for (final h in habits) {
+      if (h.createdAt.isBefore(globalOldest)) globalOldest = h.createdAt;
+    }
+    
+    int oldestYear = globalOldest.year;
+    int currentYear = DateTime.now().year;
+    
+    List<int> years = [];
+    for (int y = currentYear; y >= oldestYear; y--) {
+      years.add(y);
+    }
+    if (years.isEmpty) years.add(currentYear);
+    return years;
   }
 
   String curr = "overview";
@@ -863,13 +892,66 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Activity\nHeatmap',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        Text(
+                          'Activity Heatmap',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        Builder(
+                          builder: (context) {
+                            final years = _getAvailableYears(habits);
+                            if (!years.contains(_selectedYear)) {
+                               WidgetsBinding.instance.addPostFrameCallback((_) {
+                                 if (mounted) setState(() => _selectedYear = years.first);
+                               });
+                            }
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: years.contains(_selectedYear) ? _selectedYear : years.first,
+                                  isDense: true,
+                                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  items: years.map((y) {
+                                    return DropdownMenuItem(
+                                      value: y,
+                                      child: Text(y.toString()),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null && val != _selectedYear) {
+                                      setState(() => _selectedYear = val);
+                                      if (val == DateTime.now().year) {
+                                        int w = DateTime.now().difference(DateTime(val, 1, 1)).inDays ~/ 7;
+                                        _scrollController.animateTo(math.max(0.0, w * 16.0 - 200.0), duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+                                      } else {
+                                        _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+                                      }
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -888,7 +970,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     'LESS',
                     style: TextStyle(
                       fontSize: 8,
-                      color: const Color(0xFF9BE9A8),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -945,7 +1027,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     'MORE',
                     style: TextStyle(
                       fontSize: 8,
-                      color: const Color(0xFF216E39),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -973,117 +1055,146 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   Widget _buildRealHeatmapGrid(List<Habit> habits) {
-    const int cols = 20;
-    const int rows = 5;
-    final today = DateTime.now();
+    if (habits.isEmpty) return const SizedBox();
 
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            for (int i = 0; i < cols; i++)
-              Column(
-                children: [
-                  for (int j = 0; j < rows; j++)
-                    Builder(
-                      builder: (context) {
-                        int daysAgo =
-                            ((cols - 1 - i) * rows) + ((rows - 1 - j));
-                        DateTime date = today.subtract(Duration(days: daysAgo));
-                        String dStr = _formatDate(date);
+    final now = DateTime.now();
+    bool isCurrentYear = _selectedYear == now.year;
+    
+    DateTime endDate = DateTime(_selectedYear, 12, 31);
 
-                        int count = 0;
-                        for (final h in habits) {
-                          if (h.dailyRecords[dStr]?.isCompleted == true)
-                            count++;
-                        }
+    DateTime oldestDate = endDate;
 
-                        Color baseColor = const Color(
-                          0xFF216E39,
-                        ); // GitHub Green
-                        if (_selectedViewMode != 'Overview') {
-                          final h = habits.firstWhere(
-                            (h) => h.id == _selectedViewMode,
-                          );
-                          baseColor = Color(h.colorValue);
-                        }
+    if (_selectedViewMode == 'Overview') {
+      oldestDate = habits.first.createdAt;
+      for (final h in habits) {
+        if (h.createdAt.isBefore(oldestDate)) oldestDate = h.createdAt;
+      }
+    } else {
+      final selected = habits.firstWhere(
+        (h) => h.id == _selectedViewMode,
+        orElse: () => habits.first,
+      );
+      oldestDate = selected.createdAt;
+    }
 
-                        Color color =
-                            Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest;
+    oldestDate = DateTime(oldestDate.year, oldestDate.month, oldestDate.day);
+    
+    int cols = 53;
 
-                        if (count > 0) {
-                          if (_selectedViewMode == 'Overview') {
-                            if (count == 1)
-                              color = const Color(0xFF9BE9A8);
-                            else if (count == 2)
-                              color = const Color(0xFF40C463);
-                            else if (count == 3)
-                              color = const Color(0xFF30A14E);
-                            else if (count >= 4)
-                              color = const Color(0xFF216E39);
-                          } else {
-                            color = baseColor;
-                          }
-                        }
+    const int rows = 7;
+    
+    List<Widget> gridColumns = [];
+    List<Widget> labelColumns = [];
 
-                        return Container(
-                          width: 10,
-                          height: 10,
-                          margin: const EdgeInsets.only(bottom: 3),
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-          ],
+    String currentMonth = '';
+
+    for (int i = 0; i < cols; i++) {
+      List<Widget> cells = [];
+      String monthLabel = '';
+
+      for (int j = 0; j < rows; j++) {
+        int daysAgo = ((cols - 1 - i) * rows) + ((rows - 1 - j));
+        DateTime date = endDate.subtract(Duration(days: daysAgo));
+        bool isOutsideYear = date.year != _selectedYear;
+
+        if (j == 0) {
+          String m = '${_getMonthLabelAbsolute(date.month - 1)} ${date.year}';
+          if (m != currentMonth) {
+            currentMonth = m;
+            if (!isOutsideYear) {
+              monthLabel = m;
+            }
+          }
+        }
+
+        String dStr = _formatDate(date);
+        int count = 0;
+        for (final h in habits) {
+          if (h.dailyRecords[dStr]?.isCompleted == true) count++;
+        }
+
+        Color baseColor = const Color(0xFF216E39);
+        if (_selectedViewMode != 'Overview') {
+          final h = habits.firstWhere(
+            (h) => h.id == _selectedViewMode,
+            orElse: () => habits.first, // Fallback
+          );
+          baseColor = Color(h.colorValue);
+        }
+
+        Color color = Theme.of(context).colorScheme.surfaceContainerHighest;
+        if (isOutsideYear) {
+          color = Colors.transparent;
+        }
+
+        if (count > 0 && !isOutsideYear) {
+          if (_selectedViewMode == 'Overview') {
+            if (count == 1)
+              color = const Color(0xFF9BE9A8);
+            else if (count == 2)
+              color = const Color(0xFF40C463);
+            else if (count == 3)
+              color = const Color(0xFF30A14E);
+            else if (count >= 4)
+              color = const Color(0xFF216E39);
+          } else {
+            color = baseColor;
+          }
+        }
+
+        cells.add(
+          Container(
+            width: 12,
+            height: 12,
+            margin: const EdgeInsets.only(bottom: 4, right: 4),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        );
+      }
+
+      gridColumns.add(
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: cells),
+      );
+
+      labelColumns.add(
+        Container(
+          width: 16,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            monthLabel,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _getMonthLabel(3),
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              _getMonthLabel(2),
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              _getMonthLabel(1),
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              _getMonthLabel(0),
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 10),
-          ],
-        ),
-      ],
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: gridColumns,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: labelColumns,
+          ),
+        ],
+      ),
     );
   }
 

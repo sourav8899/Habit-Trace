@@ -74,6 +74,13 @@ class _HabitFlowAppState extends ConsumerState<HabitFlowApp> {
 
   void _handleUri(Uri? uri) {
     if (uri == null) return;
+    
+    // Prevent widget deep links from bypassing the onboarding flow
+    final userState = ref.read(userProvider);
+    if (!userState.hasCompletedOnboarding) {
+      return;
+    }
+
     // Expected URI: habitflow://habit/{habitId}
     if (uri.scheme == 'habitflow' && uri.host == 'habit') {
       final habitId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
