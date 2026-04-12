@@ -25,6 +25,21 @@
 
 ## 📸 Screenshots
 
+<h3 align="center">🏠 Dashboard</h3>
+<p align="center">
+  <img src="https://github.com/sourav8899/habit_flow/blob/main/dashboard.png?raw=true" width="300"/>
+</p>
+
+<h3 align="center">📊 Stats Screen</h3>
+<p align="center">
+  <img src="https://github.com/sourav8899/habit_flow/blob/main/statscreen.png?raw=true" width="300"/>
+</p>
+
+<h3 align="center">🔲 Widget</h3>
+<p align="center">
+  <img src="https://github.com/sourav8899/habit_flow/blob/main/widget.png?raw=true" width="500"/>
+</p>
+
 ## 🛠️ Architecture and Stack
 
 - **Framework**: [Flutter](https://flutter.dev) & Dart ^3.7.2
