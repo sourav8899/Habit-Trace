@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/icon.png" width="120" height="120" alt="Habit Trace Logo" />
+  <img src="https://github.com/sourav8899/Habit-Trace/blob/main/assets/icon.png?raw=true" width="120" height="120" alt="Habit Trace Logo" />
   <h1>Habit Trace</h1>
   <p><b>A beautifully crafted, offline-first habit tracker built with Flutter.</b></p>
   
