@@ -1,4 +1,4 @@
-
+<div align="center">
   <img src="assets/icon.png" width="120" height="120" alt="Habit Trace Logo" />
   <h1>Habit Trace</h1>
   <p><b>A beautifully crafted, offline-first habit tracker built with Flutter.</b></p>
