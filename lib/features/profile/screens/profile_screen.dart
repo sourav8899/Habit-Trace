@@ -201,7 +201,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'HabitTrace Member', 
+                'Habit Trace Member', 
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 40),

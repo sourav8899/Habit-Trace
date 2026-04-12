@@ -51,7 +51,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Welcome to HabitTrace',
+                'Welcome to Habit Trace',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,

@@ -10,7 +10,7 @@
     <!-- Keep CPU awake to fire the alarm -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
-        android:label="habit_flow"
+        android:label="Habit Trace"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -59,10 +59,10 @@
             </intent-filter>
         </activity>
 
-        <!-- HabitTrace Widget 2×4 (with heatmap) -->
+        <!-- HabitTrace Widget Large -->
         <receiver
             android:name="com.yourname.habit_flow.HabitWidget"
-            android:label="HabitTrace (2×4)"
+            android:label="Habit Trace (Daily + Outline)"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -73,10 +73,10 @@
                 android:resource="@xml/habit_widget_info" />
         </receiver>
 
-        <!-- HabitTrace Widget 2×2 (compact) -->
+        <!-- HabitTrace Widget Small -->
         <receiver
             android:name="com.yourname.habit_flow.HabitWidgetSmall"
-            android:label="HabitTrace (2×2)"
+            android:label="Habit Trace (Single Habit)"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

@@ -114,7 +114,7 @@ class _HabitFlowAppState extends ConsumerState<HabitFlowApp> {
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'HabitTrace',
+      title: 'Habit Trace',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.lightTheme,
