@@ -25,13 +25,6 @@
 
 ## 📸 Screenshots
 
-|<img src="" width="200" alt="Home Screen"/>|<img src="" width="200" alt="Stats Screen"/>|<img src="" width="200" alt="Widgets"/>|
-|:---:|:---:|:---:|
-| <img width="1080" height="2412" alt="image" src="https://github.com/user-attachments/assets/0425d6c7-2270-4331-b659-184a7ca9f1b9" />
- |<img width="1080" height="2412" alt="image" src="https://github.com/user-attachments/assets/062c2151-b719-4c84-94df-748c959e80ba" />
-| <img width="962" height="396" alt="image" src="https://github.com/user-attachments/assets/83f9283e-078e-4c72-954a-b42f6c233482" />
- |
-
 ## 🛠️ Architecture and Stack
 
 - **Framework**: [Flutter](https://flutter.dev) & Dart ^3.7.2
