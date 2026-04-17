@@ -81,7 +81,3 @@ Habit Trace contains custom **Kotlin** bridge logic that permits fully interacti
 - Select **Widgets** and navigate to **Habit Trace**.
 - Drag the **Daily Outline** (Large 2x4 layout) or the **Single Habit** (Compact 2x2 layout) right onto your screen.
 - The widget will inherently connect to your Flutter logic engine—meaning you can tick off your daily habits without even opening the app!
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
