@@ -8,10 +8,16 @@ import '../../profile/screens/profile_screen.dart';
 import 'stats_screen.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../main.dart' show onNavigateToHabitStats;
 
 class HomeScreen extends ConsumerStatefulWidget {
   final bool openAddHabit;
-  const HomeScreen({super.key, this.openAddHabit = false});
+  final String? initialHabitId; // from widget deep link
+  const HomeScreen({
+    super.key,
+    this.openAddHabit = false,
+    this.initialHabitId,
+  });
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -19,15 +25,42 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
+  // Key lets main.dart call navigateToStats() without pushing a new route
+  final GlobalKey<_StatsScreenProxyState> _statsKey =
+      GlobalKey<_StatsScreenProxyState>();
+
+  /// Called from main.dart when the user taps a widget deep link.
+  /// Switches to the Stats tab and pre-selects the given habit.
+  void navigateToStats(String habitId) {
+    setState(() => _currentIndex = 1);
+    // Give the IndexedStack one frame to show the stats page, then select
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _statsKey.currentState?.selectHabit(habitId);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    // Register so main.dart can call navigateToStats from widget taps
+    onNavigateToHabitStats = navigateToStats;
     if (widget.openAddHabit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showAddHabitDialog();
       });
     }
+    // Deep link from cold launch
+    if (widget.initialHabitId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigateToStats(widget.initialHabitId!);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    onNavigateToHabitStats = null;
+    super.dispose();
   }
 
   String _formatDate(DateTime date) {
@@ -96,7 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int? reminderHour,
     int? reminderMinute,
   }) {
-    if (name.trim().isEmpty || description.trim().isEmpty) return;
+    if (name.trim().isEmpty) return;
     ref
         .read(habitProvider.notifier)
         .addHabit(
@@ -240,8 +273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           builder: (context, setState) {
             final nameMissing =
                 showValidation && nameController.text.trim().isEmpty;
-            final descriptionMissing =
-                showValidation && descController.text.trim().isEmpty;
+            final descriptionMissing = false;
 
             return AlertDialog(
               backgroundColor:
@@ -513,8 +545,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    if (nameController.text.trim().isEmpty ||
-                        descController.text.trim().isEmpty) {
+                    if (nameController.text.trim().isEmpty) {
                       setState(() => showValidation = true);
                       return;
                     }
@@ -695,8 +726,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           builder: (context, setState) {
             final nameMissing =
                 showValidation && nameController.text.trim().isEmpty;
-            final descriptionMissing =
-                showValidation && descController.text.trim().isEmpty;
+            final descriptionMissing = false;
 
             return AlertDialog(
               backgroundColor:
@@ -959,8 +989,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    if (nameController.text.trim().isEmpty ||
-                        descController.text.trim().isEmpty) {
+                    if (nameController.text.trim().isEmpty) {
                       setState(() => showValidation = true);
                       return;
                     }
@@ -1434,7 +1463,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex > 1 ? 0 : _currentIndex,
-        children: [_buildDashboard(activeHabitsList), StatsScreen()],
+        children: [_buildDashboard(activeHabitsList), _StatsScreenProxy(key: _statsKey)],
       ),
       bottomNavigationBar: BottomNavigationBar(
         elevation: 10,
@@ -1461,6 +1490,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Thin wrapper so HomeScreen can imperatively call selectHabit() on the
+// Stats page that lives inside the IndexedStack (no new route needed).
+// ─────────────────────────────────────────────────────────────────────────────
+class _StatsScreenProxy extends StatefulWidget {
+  const _StatsScreenProxy({super.key});
+
+  @override
+  _StatsScreenProxyState createState() => _StatsScreenProxyState();
+}
+
+class _StatsScreenProxyState extends State<_StatsScreenProxy> {
+  String? _pendingHabitId;
+
+  /// Called by HomeScreen.navigateToStats to pre-select a habit.
+  void selectHabit(String habitId) {
+    setState(() => _pendingHabitId = habitId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StatsScreen(
+      key: ValueKey(_pendingHabitId),
+      initialHabitId: _pendingHabitId,
     );
   }
 }

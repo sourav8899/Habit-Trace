@@ -13,7 +13,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
-import android.util.TypedValue
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
@@ -26,7 +25,7 @@ class HabitWidget : AppWidgetProvider() {
 
     companion object {
         const val ACTION_TICK_TODAY = "com.yourname.habit_flow.ACTION_TICK_TODAY"
-        private val SDF = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        private val SDF = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
         fun updateAllWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -167,8 +166,6 @@ class HabitWidget : AppWidgetProvider() {
             val headerH = 34 * density  // approx header row height
             val marginTop = 6 * density
 
-            val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-            val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)
             val maxWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 500)
             val maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 200)
 
@@ -200,13 +197,6 @@ class HabitWidget : AppWidgetProvider() {
                 (0 until arr.length()).map { arr.getJSONObject(it) }
                     .firstOrNull { it.optString("id") == id }
             } catch (e: Exception) { null }
-        }
-
-        private fun makePillColor(base: Int): Int {
-            val r = Color.red(base)
-            val g = Color.green(base)
-            val b = Color.blue(base)
-            return Color.argb(220, r, g, b)
         }
 
         /**
@@ -341,6 +331,7 @@ class HabitWidget : AppWidgetProvider() {
                 val today  = SDF.format(Date())
                 compl.put(today, !compl.optBoolean(today, false))
                 obj.put("completions", compl)
+                arr.put(i, obj)
                 prefs.edit().putString("habits_list", arr.toString()).apply()
                 break
             }

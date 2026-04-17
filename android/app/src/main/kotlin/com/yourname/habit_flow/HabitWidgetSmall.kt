@@ -21,7 +21,7 @@ class HabitWidgetSmall : AppWidgetProvider() {
 
     companion object {
         const val ACTION_TICK_TODAY_SMALL = "com.yourname.habit_flow.ACTION_TICK_TODAY_SMALL"
-        private val SDF = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        private val SDF = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
         fun updateAllWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -219,6 +219,7 @@ class HabitWidgetSmall : AppWidgetProvider() {
                 val today = SDF.format(Date())
                 compl.put(today, !compl.optBoolean(today, false))
                 obj.put("completions", compl)
+                arr.put(i, obj)
                 prefs.edit().putString("habits_list", arr.toString()).apply()
                 break
             }

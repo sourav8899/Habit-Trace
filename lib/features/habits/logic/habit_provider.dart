@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:home_widget/home_widget.dart';
 import '../../../core/services/notification_service.dart';
 import '../models/habit.dart';
 import '../repositories/habit_repository.dart';
@@ -23,8 +26,68 @@ class HabitNotifier extends Notifier<List<Habit>> {
 
   HabitRepository get _repo => ref.read(habitRepositoryProvider);
 
+  /// Synchronizes state with widget data (used on app resume)
+  Future<void> syncWithWidget() async {
+    await _loadAll();
+  }
+
   Future<void> _loadAll() async {
-    state = await _repo.getHabits();
+    List<Habit> loadedState = await _repo.getHabits();
+
+    try {
+      final widgetDataStr =
+          await HomeWidget.getWidgetData<String>('habits_list');
+      if (widgetDataStr != null && widgetDataStr.isNotEmpty) {
+        final List<dynamic> widgetData =
+            jsonDecode(widgetDataStr) as List<dynamic>;
+        final Map<String, Map<String, bool>> widgetCompletions = {};
+        for (final data in widgetData) {
+          if (data is Map<String, dynamic> &&
+              data['id'] != null &&
+              data['completions'] is Map) {
+            widgetCompletions[data['id'] as String] =
+                (data['completions'] as Map).map(
+              (k, v) => MapEntry(k as String, v as bool),
+            );
+          }
+        }
+
+        bool stateChanged = false;
+        final List<Habit> mergedState = [];
+        for (final habit in loadedState) {
+          final wCompletions = widgetCompletions[habit.id];
+          if (wCompletions != null) {
+            final newRecords =
+                Map<String, HabitDayRecord>.from(habit.dailyRecords);
+            bool habitChanged = false;
+            for (final entry in wCompletions.entries) {
+              final currentRecord =
+                  newRecords[entry.key] ?? HabitDayRecord();
+              if (currentRecord.isCompleted != entry.value) {
+                newRecords[entry.key] =
+                    currentRecord.copyWith(isCompleted: entry.value);
+                habitChanged = true;
+                stateChanged = true;
+              }
+            }
+            if (habitChanged) {
+              mergedState.add(habit.copyWith(dailyRecords: newRecords));
+              continue;
+            }
+          }
+          mergedState.add(habit);
+        }
+        loadedState = mergedState;
+
+        if (stateChanged) {
+          await _repo.saveHabits(loadedState);
+        }
+      }
+    } catch (e) {
+      debugPrint('[HabitProvider] Widget sync error: $e');
+    }
+
+    state = loadedState;
     WidgetService.update(state);
     await NotificationService.syncHabitReminders(state);
   }

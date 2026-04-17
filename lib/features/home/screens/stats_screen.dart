@@ -220,7 +220,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final allHabits = ref.watch(habitProvider);
     final hasNoHabits = allHabits.isEmpty;
 
+    // Only reset to Overview when habits have loaded AND the target ID is gone
+    // (e.g. the habit was deleted). Never reset while the list is still loading,
+    // or the deep-link habit ID is permanently lost.
     if (_selectedViewMode != 'Overview' &&
+        allHabits.isNotEmpty &&
         !allHabits.any((h) => h.id == _selectedViewMode)) {
       _selectedViewMode = 'Overview';
     }
